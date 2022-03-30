@@ -1,34 +1,17 @@
 <script setup lang="ts">
-import Piece from '../components/Piece.vue'
+import type { BlockState } from '~/types'
+import { GAME, TEAM } from '~/types'
+import ChessBlock from '~/components/ChessBlock.vue'
+import { GamePlay } from '~/composables/logic'
 const WIDTH = 10
 const HEIGHT = 10
-enum TEAM {BLACK, WHITE, NONE}
-interface BlockState{
-  empty: boolean
-  team: TEAM
-  x: number
-  y: number
-  selected: boolean
-}
-const chess = getChess()
-const state = reactive({
-  chess,
-  selectOneBlock: false,
-  selectedBlock: chess[0][0],
-})
-function generatePathBetweenBlocks(blockState1: BlockState, blockState2: BlockState) {
-  // const paths = []
+// CHESSNUM * CHESSNUM are chesses
+const CHESSNUM = 2
+const play = new GamePlay(WIDTH, HEIGHT, CHESSNUM)
 
-}
-// check if the point is valid
-function checkPointValidity(x: number, y: number): boolean {
-  if (x < 0 || x >= WIDTH) return false
-  if (y < 0 || y >= HEIGHT) return false
-  return true
-}
 // check if the path is valid
 function checkPathValidity(blockState: BlockState): boolean {
-  const { x, y } = state.selectedBlock
+  const { x, y } = play.state.value.selectedBlock
   if (!blockState.empty) return false
   const distance = Math.abs(x - blockState.x) + Math.abs(y - blockState.y)
   if (distance === 1) {
@@ -43,131 +26,90 @@ function checkPathValidity(blockState: BlockState): boolean {
       return true
 
     if (Math.abs(x - blockState.x) === 2 && Math.abs(y - blockState.y) === 2) {
-      if (!state.chess[newX][newY].empty) return true
+      if (!play.state.value.board[newY][newX].empty) return true
       return false
     }
+    // alert(`x:${blockState.x} y:${blockState.y} stateX: ${x} stateY:${y}`)
+    // alert(`${(Math.abs(x - blockState.x) === 0 && Math.abs(y - blockState.y) === 2)}`)
     if ((Math.abs(x - blockState.x) === 2 && Math.abs(y - blockState.y) === 0)
     || (Math.abs(x - blockState.x) === 0 && Math.abs(y - blockState.y) === 2)) {
-      if (!state.chess[newX][newY].empty) return true
+      if (!play.state.value.board[newY][newX].empty) return true
       return false
     }
     return false
   }
 }
-function getBlockClass(blockState: BlockState) {
-  if (blockState.selected) return 'bg-orange/50'
-  return ''
-}
+
 function onBlockClicked(blockState: BlockState) {
+  if (play.state.value.gaming !== GAME.GAMING) return
   if (blockState.empty) {
     // Exists eleted block check validity
-    if (state.selectOneBlock && checkPathValidity(blockState)) {
-      const block = state.selectedBlock
+    if (play.state.value.selectOneBlock && checkPathValidity(blockState)) {
+      const block = play.state.value.selectedBlock
+      // 记录白方和黑方得分数
+      if (block?.belong !== TEAM.NONE && block?.team !== block?.belong) {
+        if (block?.team === TEAM.BLACK)play.state.value.blackScore--
+        else play.state.value.whiteScore--
+      }
+      if (blockState.belong !== TEAM.NONE && block?.team !== blockState.belong) {
+        if (block?.team === TEAM.BLACK)play.state.value.blackScore++
+        else play.state.value.whiteScore++
+      }
       //  将相应的block信息填入
       blockState.empty = false
-      blockState.team = state.selectedBlock.team
+      blockState.team = play.state.value.selectedBlock?.team
       // 将原先block信息清空
       block.empty = true
       block.team = TEAM.NONE
       block.selected = false
       // 将选中信息清空
-      state.selectOneBlock = false
+      play.state.value.selectOneBlock = false
       // 正常来说应当启用下一行 但是Eslint不允许
-      // state.selectedBlock = null
+      play.state.value.selectedBlock = null
+
+      // 切换下棋权
+      play.switchTurn()
     }
   }
   else {
+    if (play.state.value.turn !== blockState.team) return
     // switch the eleted block to new one
-    if (state.selectOneBlock)
-      state.selectedBlock.selected = false
+    if (play.state.value.selectOneBlock)
+      play.state.value.selectedBlock.selected = false
     blockState.selected = true
-    state.selectOneBlock = true
-    state.selectedBlock = blockState
+    play.state.value.selectOneBlock = true
+    play.state.value.selectedBlock = blockState
   }
 }
-
-function getBlockState(x: number, y: number): BlockState {
-  let blockState: BlockState
-  if (x < 3 && y < 3) {
-    blockState = {
-      empty: false,
-      x,
-      y,
-      team: TEAM.BLACK,
-      selected: false,
-    }
-  }
-  else if (x >= WIDTH - 3 && y >= HEIGHT - 3) {
-    blockState = {
-      x,
-      y,
-      empty: false,
-      team: TEAM.WHITE,
-      selected: false,
-    }
-  }
-  else {
-    blockState = {
-      x,
-      y,
-      empty: true,
-      selected: false,
-      team: TEAM.NONE,
-    }
-  }
-  return blockState
-}
-function getChess() {
-  const chess = []
-  for (let y = 0; y < HEIGHT; y++) {
-    const state: BlockState[] = []
-    for (let x = 0; x < WIDTH; x++) {
-      const blockState: BlockState = getBlockState(x, y)
-      state.push(blockState)
-    }
-    chess.push(state)
-  }
-  return chess
-}
-
+watchEffect(() => {
+  play.checkGameState()
+})
 </script>
 
 <template>
-  <div
-    v-for="rowState,y in state.chess"
-    :key="y"
-    flex
-    justify-center
-    items-center
-  >
+  <div>
+    <div btn @click="play.LaunchGame()">
+      GO
+    </div>
+    {{ play.state.value.gaming === GAME.READY? 'READY': (play.state.value.gaming === GAME.GAMING? 'GAMING':'DONE') }}
+    BLACK: {{ play.state.value.blackScore }} WHITE:{{ play.state.value.whiteScore }}
+  </div>
+  <div>
     <div
-      v-for="blockState,x in rowState"
-      :key="x"
+      v-for="rowState,y in play.state.value.board"
+      :key="y"
+      flex
+      justify-center
+      items-center
     >
       <div
-        border
-        w-15 h-15
-        flex
-        justify-center
-        items-center
-        :class="getBlockClass(blockState)"
-        @click="onBlockClicked(blockState)"
+        v-for="blockState,x in rowState"
+        :key="x"
       >
-        <div v-if="blockState.empty">
-          {{ ' ' }}
-        </div>
-        <div
-          v-else
-          i-mdi:chess-pawn
-          text-red-400
-        >
-        <!-- <div
-          v-else
-        >
-          {{ blockState.team == TEAM.BLACK? 'O':'X' }}
-        </div> -->
-        <!-- {{ !blockState.empty?'X':'O' }} -->
-        </div>
+        <ChessBlock
+          :block-state="blockState"
+          @click="onBlockClicked(blockState)"
+        />
       </div>
     </div>
   </div>

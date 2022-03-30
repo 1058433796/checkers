@@ -10,6 +10,7 @@
     "test": "vitest"
   },
   "dependencies": {
+    "@iconify-json/fa-solid": "^1.1.1",
     "@vueuse/core": "^8.1.1",
     "vue": "^3.2.31",
     "vue-router": "^4.0.14"

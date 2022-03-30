@@ -4,9 +4,8 @@
 
 declare module 'vue' {
   export interface GlobalComponents {
-    Counter: typeof import('./src/components/Counter.vue')['default']
+    ChessBlock: typeof import('./src/components/ChessBlock.vue')['default']
     Footer: typeof import('./src/components/Footer.vue')['default']
-    Piece: typeof import('./src/components/Piece.vue')['default']
   }
 }
 
